@@ -5,8 +5,5 @@ plotly
 scikit-learn
 joblib
 bcrypt
-pyngrok
 reportlab
-streamlit-oauth
-authlib
 
