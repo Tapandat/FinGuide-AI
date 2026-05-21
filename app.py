@@ -1,4 +1,5 @@
 
+
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -7,6 +8,7 @@ import plotly.express as px
 import joblib
 import numpy as np
 from email_service import send_email
+from streamlit_oauth import OAuth2Component
 
 # ---------------- PAGE CONFIG ----------------
 
@@ -30,8 +32,9 @@ st.markdown("""
 /* Sidebar */
 
 section[data-testid="stSidebar"] {
-    background-color: #0f172a;
+    background-color: #020c2b;
     color: white;
+    padding-top: 20px;
 }
 
 /* Sidebar Text */
@@ -40,14 +43,14 @@ section[data-testid="stSidebar"] * {
     color: white !important;
 }
 
-/* Main Titles */
+/* Titles */
 
 h1 {
     color: #0f172a !important;
-    font-weight: 700;
+    font-weight: 800;
 }
 
-h2, h3, h4 {
+h2, h3 {
     color: #1e293b !important;
 }
 
@@ -64,7 +67,7 @@ h2, h3, h4 {
     border-radius: 15px;
 
     box-shadow:
-        0px 2px 8px rgba(0,0,0,0.05);
+        0px 2px 10px rgba(0,0,0,0.05);
 
 }
 
@@ -94,7 +97,7 @@ h2, h3, h4 {
 
 }
 
-/* Input Fields */
+/* Inputs */
 
 .stTextInput input,
 .stNumberInput input {
@@ -107,18 +110,63 @@ h2, h3, h4 {
 
 }
 
-/* Tables */
+/* Authentication Toggle */
 
-[data-testid="stDataFrame"] {
+.stRadio > div {
+
+    flex-direction: row;
+
+    gap: 10px;
+
+}
+
+.stRadio label {
+
+    background-color: #1e293b;
+
+    color: white !important;
+
+    padding: 10px 20px;
 
     border-radius: 10px;
 
-    overflow: hidden;
+    font-weight: 600;
+
+    border: 1px solid #334155;
+
+}
+
+.stRadio label:hover {
+
+    background-color: #2563eb;
 
 }
 
 </style>
 """, unsafe_allow_html=True)
+
+# ---------------- GOOGLE OAUTH ----------------
+
+CLIENT_ID = "626542608090-nn3jbnqjb66fn4p0c4p4c4hsp5d1cas2.apps.googleusercontent.com"
+
+CLIENT_SECRET = "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"
+
+AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/auth"
+
+TOKEN_URL = "https://oauth2.googleapis.com/token"
+
+REFRESH_TOKEN_URL = TOKEN_URL
+
+REVOKE_TOKEN_URL = "https://oauth2.googleapis.com/revoke"
+
+oauth2 = OAuth2Component(
+    CLIENT_ID,
+    CLIENT_SECRET,
+    AUTHORIZE_URL,
+    TOKEN_URL,
+    REFRESH_TOKEN_URL,
+    REVOKE_TOKEN_URL
+)
 
 # ---------------- DATABASE ----------------
 
@@ -351,9 +399,12 @@ if not st.session_state.logged_in:
 
     st.title("💰 FinGuide AI")
 
-    auth_mode = st.sidebar.selectbox(
-        "Authentication",
-        ["Login", "Register"]
+    st.sidebar.markdown("## 🔐 Authentication")
+
+    auth_mode = st.sidebar.radio(
+        "",
+        ["Login", "Register"],
+        horizontal=True
     )
 
     username = st.text_input("Username")
@@ -365,7 +416,41 @@ if not st.session_state.logged_in:
         type="password"
     )
 
-    # REGISTER
+    # ---------------- GOOGLE LOGIN ----------------
+
+    st.markdown("### Continue with Google")
+
+    result = oauth2.authorize_button(
+        name="Continue with Google",
+        icon="https://www.google.com/favicon.ico",
+        redirect_uri="https://finguide-ai-mxvazz4ebavaspofa5bmzh.streamlit.app/",
+        scope="openid email profile",
+        key="google",
+    )
+
+    if result and "token" in result:
+
+        token = result["token"]
+
+        user_info = token["userinfo"]
+
+        email = user_info["email"]
+
+        username = user_info["name"]
+
+        st.session_state.logged_in = True
+
+        st.session_state.username = username
+
+        st.session_state.email = email
+
+        st.success(
+            f"Welcome {username}"
+        )
+
+        st.rerun()
+
+    # ---------------- REGISTER ----------------
 
     if auth_mode == "Register":
 
@@ -389,7 +474,7 @@ if not st.session_state.logged_in:
                     "Username already exists"
                 )
 
-    # LOGIN
+    # ---------------- LOGIN ----------------
 
     else:
 
@@ -439,19 +524,11 @@ else:
 
         st.rerun()
 
-    # ---------------- CURRENT USER ----------------
-
     current_user = st.session_state.username
 
-    # ---------------- LOAD DATA ----------------
+    expense_df = load_expenses(current_user)
 
-    expense_df = load_expenses(
-        current_user
-    )
-
-    income_df = load_income(
-        current_user
-    )
+    income_df = load_income(current_user)
 
     total_income = (
         income_df['amount'].sum()
@@ -490,40 +567,6 @@ else:
 
         st.markdown("---")
 
-        # Financial Health
-
-        if total_income > 0:
-
-            ratio = (
-                savings / total_income
-            ) * 100
-
-        else:
-
-            ratio = 0
-
-        st.subheader("Financial Health")
-
-        if ratio >= 40:
-
-            st.success(
-                "Excellent 🟢"
-            )
-
-        elif ratio >= 20:
-
-            st.warning(
-                "Good 🟡"
-            )
-
-        else:
-
-            st.error(
-                "Poor 🔴"
-            )
-
-        # Charts
-
         if not expense_df.empty:
 
             category_data = expense_df.groupby(
@@ -542,7 +585,7 @@ else:
                 use_container_width=True
             )
 
-    # ---------------- INCOME MANAGER ----------------
+    # ---------------- INCOME ----------------
 
     elif menu == "Income Manager":
 
@@ -553,14 +596,14 @@ else:
             [
                 "Salary",
                 "Freelancing",
-                "Investments",
                 "Business",
+                "Investments",
                 "Other"
             ]
         )
 
         amount = st.number_input(
-            "Income Amount",
+            "Amount",
             min_value=0.0
         )
 
@@ -576,15 +619,13 @@ else:
                 "Income Added Successfully ✅"
             )
 
-        st.subheader("Income History")
-
         st.dataframe(income_df)
 
-    # ---------------- EXPENSE ENTRY ----------------
+    # ---------------- EXPENSE ----------------
 
     elif menu == "Expense Entry":
 
-        st.title("➕ Add Expense")
+        st.title("➕ Expense Entry")
 
         category = st.selectbox(
             "Category",
@@ -616,7 +657,7 @@ else:
             )
 
             st.success(
-                "Expense Added Successfully ✅"
+                "Expense Saved Successfully ✅"
             )
 
     # ---------------- ANALYTICS ----------------
@@ -635,8 +676,8 @@ else:
                 category_data,
                 x='category',
                 y='amount',
-                text='amount',
-                color='category'
+                color='category',
+                text='amount'
             )
 
             st.plotly_chart(
@@ -644,17 +685,9 @@ else:
                 use_container_width=True
             )
 
-            st.subheader("Expense History")
-
             st.dataframe(expense_df)
 
-        else:
-
-            st.info(
-                "No expense data available."
-            )
-
-    # ---------------- BUDGET PLANNER ----------------
+    # ---------------- BUDGET ----------------
 
     elif menu == "Budget Planner":
 
@@ -676,21 +709,15 @@ else:
 
         if total_expense > monthly_budget:
 
-            st.error(
-                "Budget Exceeded ⚠️"
-            )
+            st.error("Budget Exceeded ⚠️")
 
         elif total_expense > monthly_budget * 0.8:
 
-            st.warning(
-                "80% Budget Used"
-            )
+            st.warning("80% Budget Used")
 
         else:
 
-            st.success(
-                "Budget Under Control ✅"
-            )
+            st.success("Budget Under Control ✅")
 
     # ---------------- PREDICTIONS ----------------
 
@@ -723,10 +750,10 @@ else:
                 f"Predicted Expense: ₹{prediction[0]:.2f}"
             )
 
-        except:
+        except Exception as e:
 
-            st.warning(
-                "Train ML model first."
+            st.error(
+                f"Prediction Error: {e}"
             )
 
     # ---------------- SETTINGS ----------------
@@ -746,7 +773,7 @@ else:
         if st.button("Send Monthly Report"):
 
             report = f"""
-FinGuide AI - Monthly Financial Summary
+FinGuide AI Monthly Financial Summary
 
 ---------------------------------------
 
@@ -758,50 +785,6 @@ Total Savings: ₹{savings}
 
 ---------------------------------------
 """
-
-            # Financial Health
-
-            if total_income > 0:
-
-                ratio = (
-                    savings / total_income
-                ) * 100
-
-            else:
-
-                ratio = 0
-
-            if ratio >= 40:
-
-                report += "\nFinancial Health: Excellent"
-
-            elif ratio >= 20:
-
-                report += "\nFinancial Health: Good"
-
-            else:
-
-                report += "\nFinancial Health: Poor"
-
-            # AI Recommendations
-
-            report += "\n\nAI Recommendations:\n"
-
-            if total_expense > total_income * 0.8:
-
-                report += (
-                    "- Reduce monthly spending.\n"
-                )
-
-            else:
-
-                report += (
-                    "- Budget is under control.\n"
-                )
-
-            report += (
-                "- Continue tracking expenses regularly.\n"
-            )
 
             send_email(
                 user_email,
