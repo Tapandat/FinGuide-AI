@@ -525,7 +525,7 @@ else:
         ]
     )
 
-   if st.sidebar.button("Logout"):
+if st.sidebar.button("Logout"):
 
     st.session_state.clear()
 
