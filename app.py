@@ -536,7 +536,7 @@ if st.sidebar.button("Logout"):
     None
 )
 
-if current_user is None:
+  if current_user is None:
 
     st.warning(
         "Please login again."
