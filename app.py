@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import pandas as pd
 import sqlite3
@@ -8,7 +6,6 @@ import plotly.express as px
 import joblib
 import numpy as np
 from email_service import send_email
-from streamlit_oauth import OAuth2Component
 
 # ---------------- PAGE CONFIG ----------------
 
@@ -110,69 +107,74 @@ h2, h3 {
 
 }
 
-/* Authentication Toggle */
-
-.stRadio > div {
-
-    flex-direction: row;
-
-    gap: 10px;
-
-}
-
-.stRadio label {
-
-    background-color: #1e293b;
-
-    color: white !important;
-
-    padding: 10px 20px;
-
-    border-radius: 10px;
-
-    font-weight: 600;
-
-    border: 1px solid #334155;
-
-}
-
-.stRadio label:hover {
-
-    background-color: #2563eb;
-
-}
-
 </style>
 """, unsafe_allow_html=True)
-
-# ---------------- GOOGLE OAUTH ----------------
-
-CLIENT_ID = "626542608090-nn3jbnqjb66fn4p0c4p4c4hsp5d1cas2.apps.googleusercontent.com"
-
-CLIENT_SECRET = "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"
-
-AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/auth"
-
-TOKEN_URL = "https://oauth2.googleapis.com/token"
-
-REFRESH_TOKEN_URL = TOKEN_URL
-
-REVOKE_TOKEN_URL = "https://oauth2.googleapis.com/revoke"
-
-oauth2 = OAuth2Component(
-    CLIENT_ID,
-    CLIENT_SECRET,
-    AUTHORIZE_URL,
-    TOKEN_URL,
-    REFRESH_TOKEN_URL,
-    REVOKE_TOKEN_URL
-)
 
 # ---------------- DATABASE ----------------
 
 def create_connection():
 
     return sqlite3.connect("finance.db")
+
+# ---------------- CREATE TABLES ----------------
+
+conn = create_connection()
+
+cursor = conn.cursor()
+
+cursor.execute("""
+
+CREATE TABLE IF NOT EXISTS users (
+
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    username TEXT UNIQUE,
+
+    email TEXT UNIQUE,
+
+    password BLOB
+
+)
+
+""")
+
+cursor.execute("""
+
+CREATE TABLE IF NOT EXISTS expenses (
+
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    user_id TEXT,
+
+    category TEXT,
+
+    amount REAL,
+
+    note TEXT
+
+)
+
+""")
+
+cursor.execute("""
+
+CREATE TABLE IF NOT EXISTS income (
+
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    user_id TEXT,
+
+    source TEXT,
+
+    amount REAL
+
+)
+
+""")
+
+conn.commit()
+
+conn.close()
 
 # ---------------- USER FUNCTIONS ----------------
 
@@ -214,7 +216,9 @@ def register_user(
 
         return True
 
-    except:
+    except Exception as e:
+
+        st.error(e)
 
         return False
 
@@ -393,18 +397,15 @@ if "logged_in" not in st.session_state:
 
     st.session_state.logged_in = False
 
-# ---------------- AUTH SCREEN ----------------
+# ---------------- AUTH ----------------
 
 if not st.session_state.logged_in:
 
     st.title("💰 FinGuide AI")
 
-    st.sidebar.markdown("## 🔐 Authentication")
-
     auth_mode = st.sidebar.radio(
-        "",
-        ["Login", "Register"],
-        horizontal=True
+        "Choose Option",
+        ["Login", "Register"]
     )
 
     username = st.text_input("Username")
@@ -415,48 +416,6 @@ if not st.session_state.logged_in:
         "Password",
         type="password"
     )
-
-      # ---------------- GOOGLE LOGIN ----------------
-
-    st.markdown("### Continue with Google")
-
-    try:
-
-        result = oauth2.authorize_button(
-            name="Continue with Google",
-            icon="https://www.google.com/favicon.ico",
-            redirect_uri="https://finguide-ai-mxvazz4ebavaspofa5bmzh.streamlit.app/component/streamlit_oauth.authorize_button/index.html",
-            scope="openid email profile",
-            key="google",
-        )
-
-        if result and "token" in result:
-
-            token = result["token"]
-
-            user_info = token["userinfo"]
-
-            email = user_info["email"]
-
-            username = user_info["name"]
-
-            st.session_state.logged_in = True
-
-            st.session_state.username = username
-
-            st.session_state.email = email
-
-            st.success(
-                f"Welcome {username}"
-            )
-
-            st.rerun()
-
-    except Exception:
-
-        st.warning(
-            "Google login session expired. Please try again."
-        )
 
     # ---------------- REGISTER ----------------
 
@@ -479,7 +438,7 @@ if not st.session_state.logged_in:
             else:
 
                 st.error(
-                    "Username already exists"
+                    "Registration Failed"
                 )
 
     # ---------------- LOGIN ----------------
@@ -534,8 +493,6 @@ else:
 
         st.rerun()
 
-    # ---------------- CURRENT USER ----------------
-
     current_user = st.session_state.get(
         "username",
         None
@@ -551,13 +508,9 @@ else:
 
     # ---------------- LOAD DATA ----------------
 
-    expense_df = load_expenses(
-        current_user
-    )
+    expense_df = load_expenses(current_user)
 
-    income_df = load_income(
-        current_user
-    )
+    income_df = load_income(current_user)
 
     total_income = (
         income_df['amount'].sum()
@@ -612,214 +565,4 @@ else:
             st.plotly_chart(
                 fig,
                 use_container_width=True
-            )
-    # ---------------- INCOME ----------------
-
-    elif menu == "Income Manager":
-
-        st.title("💵 Income Manager")
-
-        source = st.selectbox(
-            "Income Source",
-            [
-                "Salary",
-                "Freelancing",
-                "Business",
-                "Investments",
-                "Other"
-            ]
-        )
-
-        amount = st.number_input(
-            "Amount",
-            min_value=0.0
-        )
-
-        if st.button("Add Income"):
-
-            add_income(
-                current_user,
-                source,
-                amount
-            )
-
-            st.success(
-                "Income Added Successfully ✅"
-            )
-
-        st.dataframe(income_df)
-
-    # ---------------- EXPENSE ----------------
-
-    elif menu == "Expense Entry":
-
-        st.title("➕ Expense Entry")
-
-        category = st.selectbox(
-            "Category",
-            [
-                "Food",
-                "Transport",
-                "Bills",
-                "Entertainment",
-                "Healthcare",
-                "Education",
-                "Shopping"
-            ]
-        )
-
-        amount = st.number_input(
-            "Expense Amount",
-            min_value=0.0
-        )
-
-        note = st.text_input("Note")
-
-        if st.button("Save Expense"):
-
-            add_expense(
-                current_user,
-                category,
-                amount,
-                note
-            )
-
-            st.success(
-                "Expense Saved Successfully ✅"
-            )
-
-    # ---------------- ANALYTICS ----------------
-
-    elif menu == "Analytics":
-
-        st.title("📊 Financial Analytics")
-
-        if not expense_df.empty:
-
-            category_data = expense_df.groupby(
-                'category'
-            )['amount'].sum().reset_index()
-
-            fig = px.bar(
-                category_data,
-                x='category',
-                y='amount',
-                color='category',
-                text='amount'
-            )
-
-            st.plotly_chart(
-                fig,
-                use_container_width=True
-            )
-
-            st.dataframe(expense_df)
-
-    # ---------------- BUDGET ----------------
-
-    elif menu == "Budget Planner":
-
-        st.title("💵 Budget Planner")
-
-        monthly_budget = st.number_input(
-            "Monthly Budget",
-            min_value=0.0
-        )
-
-        remaining = (
-            monthly_budget - total_expense
-        )
-
-        st.metric(
-            "Remaining Budget",
-            f"₹{remaining}"
-        )
-
-        if total_expense > monthly_budget:
-
-            st.error("Budget Exceeded ⚠️")
-
-        elif total_expense > monthly_budget * 0.8:
-
-            st.warning("80% Budget Used")
-
-        else:
-
-            st.success("Budget Under Control ✅")
-
-    # ---------------- PREDICTIONS ----------------
-
-    elif menu == "Predictions":
-
-        st.title("🤖 AI Predictions")
-
-        try:
-
-            model = joblib.load(
-                "expense_prediction_model.pkl"
-            )
-
-            future_days = st.slider(
-                "Future Days",
-                1,
-                30,
-                7
-            )
-
-            future = np.array([
-                [len(expense_df) + future_days]
-            ])
-
-            prediction = model.predict(
-                future
-            )
-
-            st.success(
-                f"Predicted Expense: ₹{prediction[0]:.2f}"
-            )
-
-        except Exception as e:
-
-            st.error(
-                f"Prediction Error: {e}"
-            )
-
-    # ---------------- SETTINGS ----------------
-
-    elif menu == "Settings":
-
-        st.title("📧 Monthly Financial Reports")
-
-        user_email = get_user_email(
-            current_user
-        )
-
-        st.write(
-            f"Registered Email: {user_email}"
-        )
-
-        if st.button("Send Monthly Report"):
-
-            report = f"""
-FinGuide AI Monthly Financial Summary
-
----------------------------------------
-
-Total Income: ₹{total_income}
-
-Total Expenses: ₹{total_expense}
-
-Total Savings: ₹{savings}
-
----------------------------------------
-"""
-
-            send_email(
-                user_email,
-                "FinGuide AI Monthly Report",
-                report
-            )
-
-            st.success(
-                "Financial Report Sent Successfully ✅"
             )
