@@ -525,13 +525,24 @@ else:
         ]
     )
 
-    if st.sidebar.button("Logout"):
+   if st.sidebar.button("Logout"):
 
-        st.session_state.logged_in = False
+    st.session_state.clear()
 
-        st.rerun()
+    st.rerun()
 
-    current_user = st.session_state.username
+    current_user = st.session_state.get(
+    "username",
+    None
+)
+
+if current_user is None:
+
+    st.warning(
+        "Please login again."
+    )
+
+    st.stop()
 
     expense_df = load_expenses(current_user)
 
