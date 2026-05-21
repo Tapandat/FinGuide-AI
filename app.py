@@ -416,46 +416,47 @@ if not st.session_state.logged_in:
         type="password"
     )
 
-    # ---------------- GOOGLE LOGIN ----------------
+      # ---------------- GOOGLE LOGIN ----------------
 
     st.markdown("### Continue with Google")
-try:
 
-    result = oauth2.authorize_button(
-        name="Continue with Google",
-        icon="https://www.google.com/favicon.ico",
-        redirect_uri="https://finguide-ai-mxvazz4ebavaspofa5bmzh.streamlit.app/",
-        scope="openid email profile",
-        key="google",
-    )
+    try:
 
-    if result and "token" in result:
-
-        token = result["token"]
-
-        user_info = token["userinfo"]
-
-        email = user_info["email"]
-
-        username = user_info["name"]
-
-        st.session_state.logged_in = True
-
-        st.session_state.username = username
-
-        st.session_state.email = email
-
-        st.success(
-            f"Welcome {username}"
+        result = oauth2.authorize_button(
+            name="Continue with Google",
+            icon="https://www.google.com/favicon.ico",
+            redirect_uri="https://finguide-ai-mxvazz4ebavaspofa5bmzh.streamlit.app/component/streamlit_oauth.authorize_button/index.html",
+            scope="openid email profile",
+            key="google",
         )
 
-        st.rerun()
+        if result and "token" in result:
 
-except Exception:
+            token = result["token"]
 
-    st.warning(
-        "Google login session expired. Please try again."
-    )
+            user_info = token["userinfo"]
+
+            email = user_info["email"]
+
+            username = user_info["name"]
+
+            st.session_state.logged_in = True
+
+            st.session_state.username = username
+
+            st.session_state.email = email
+
+            st.success(
+                f"Welcome {username}"
+            )
+
+            st.rerun()
+
+    except Exception:
+
+        st.warning(
+            "Google login session expired. Please try again."
+        )
 
     # ---------------- REGISTER ----------------
 
@@ -525,28 +526,38 @@ else:
         ]
     )
 
-if st.sidebar.button("Logout"):
+    # ---------------- LOGOUT ----------------
 
-    st.session_state.clear()
+    if st.sidebar.button("Logout"):
 
-    st.rerun()
+        st.session_state.clear()
+
+        st.rerun()
+
+    # ---------------- CURRENT USER ----------------
 
     current_user = st.session_state.get(
-    "username",
-    None
-)
-
-  if current_user is None:
-
-    st.warning(
-        "Please login again."
+        "username",
+        None
     )
 
-    st.stop()
+    if current_user is None:
 
-    expense_df = load_expenses(current_user)
+        st.warning(
+            "Please login again."
+        )
 
-    income_df = load_income(current_user)
+        st.stop()
+
+    # ---------------- LOAD DATA ----------------
+
+    expense_df = load_expenses(
+        current_user
+    )
+
+    income_df = load_income(
+        current_user
+    )
 
     total_income = (
         income_df['amount'].sum()
@@ -602,7 +613,6 @@ if st.sidebar.button("Logout"):
                 fig,
                 use_container_width=True
             )
-
     # ---------------- INCOME ----------------
 
     elif menu == "Income Manager":
