@@ -420,6 +420,8 @@ if not st.session_state.logged_in:
 
     st.markdown("### Continue with Google")
 
+    try:
+
     result = oauth2.authorize_button(
         name="Continue with Google",
         icon="https://www.google.com/favicon.ico",
@@ -449,6 +451,12 @@ if not st.session_state.logged_in:
         )
 
         st.rerun()
+
+except Exception:
+
+    st.warning(
+        "Google login session expired. Please try again."
+    )
 
     # ---------------- REGISTER ----------------
 
