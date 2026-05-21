@@ -425,7 +425,7 @@ if not st.session_state.logged_in:
         result = oauth2.authorize_button(
             name="Continue with Google",
             icon="https://www.google.com/favicon.ico",
-            redirect_uri="https://finguide-ai-mxvazz4ebavaspofa5bmzh.streamlit.app/",
+            redirect_uri="redirect_uri="https://finguide-ai-mxvazz4ebavaspofa5bmzh.streamlit.app/component/streamlit_oauth.authorize_button/index.html",
             scope="openid email profile",
             key="google",
         )
