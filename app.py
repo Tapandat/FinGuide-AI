@@ -419,8 +419,7 @@ if not st.session_state.logged_in:
     # ---------------- GOOGLE LOGIN ----------------
 
     st.markdown("### Continue with Google")
-
-    try:
+try:
 
     result = oauth2.authorize_button(
         name="Continue with Google",
